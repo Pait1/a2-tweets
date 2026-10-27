@@ -9,42 +9,59 @@ class Tweet {
 
 	//returns either 'live_event', 'achievement', 'completed_event', or 'miscellaneous'
     get source():string {
-        //TODO: identify whether the source is a live event, an achievement, a completed event, or miscellaneous.
-        return "unknown";
+        //rules: prefix keywords
+        const t = this.text;
+        if (/^(Just completed|Just posted|Completed) /.test(t)) return 'completed_event';
+        if (/^Watch my .* right now/.test(t)) return 'live_event';
+        if (/^(Achieved a new personal|I just set a goal)/.test(t)) return 'achievement';
+        return 'miscellaneous';
     }
 
     //returns a boolean, whether the text includes any content written by the person tweeting.
     get written():boolean {
-        //TODO: identify whether the tweet is written
-        return false;
+        return this.writtenText.length > 0;
     }
 
     get writtenText():string {
-        if(!this.written) {
-            return "";
+        //strip link, hashtag
+        const t = this.text.replace(/https?:\/\/\S+/g, '').replace(/#runkeeper/gi, '').trim();
+        if (this.source == 'completed_event') {
+            const m = t.match(/^(?:Just posted|Just completed|Completed) .*? - ([\s\S]*)$/);
+            if (m) return m[1].trim();
+            if (/with @Runkeeper\. Check it out!\s*$/i.test(t)) return "";
+            return t;
         }
-        //TODO: parse the written text from the tweet
-        return "";
+        if (this.source != 'miscellaneous') {
+            //default RunKeeper phrasing only
+            return /^(Watch my|Achieved a new|I just set a goal)/.test(t) && /@Runkeeper|personal|goal/i.test(t) ? "" : t;
+        }
+        return t;
     }
 
     get activityType():string {
         if (this.source != 'completed_event') {
             return "unknown";
         }
-        //TODO: parse the activity type from the text of the tweet
-        return "";
+        //type: after 'a', before 'with'/'in'/'-'
+        const m = this.text.match(/^(?:Just completed|Just posted|Completed) an? (?:[\d.]+ ?(?:km|mi) )?(.+?)(?: in \d+:| with| -| @|\s*$)/);
+        if (!m) return "unknown";
+        return m[1].replace(/ workout$/, '').trim();
     }
 
     get distance():number {
         if(this.source != 'completed_event') {
             return 0;
         }
-        //TODO: prase the distance from the text of the tweet
-        return 0;
+        const m = this.text.match(/^(?:Just completed|Just posted|Completed) an? ([\d.]+) ?(km|mi)/);
+        if (!m) return 0;
+        //km -> mi
+        const d = parseFloat(m[1]);
+        return m[2] == 'km' ? d / 1.609 : d;
     }
 
     getHTMLTableRow(rowNumber:number):string {
-        //TODO: return a table row which summarizes the tweet with a clickable link to the RunKeeper activity
-        return "<tr></tr>";
+        //links clickable
+        const linked = this.text.replace(/(https?:\/\/\S+)/g, '<a href="$1" target="_blank">$1</a>');
+        return `<tr><td>${rowNumber}</td><td>${this.activityType}</td><td>${linked}</td></tr>`;
     }
 }
